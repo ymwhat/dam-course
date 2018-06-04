@@ -16,29 +16,19 @@ from sklearn import svm
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, KFold, cross_validate
 
-def get_data(train_file_name, test_file_name, train_month=[2, 3, 4], test_month=[5]):
+def get_data(train_file_name, test_file_name):
     try:
         print("reading data file ", os.path.abspath(train_file_name), os.path.abspath(test_file_name))
         train = pd.read_csv(train_file_name)
         test = pd.read_csv(test_file_name)
-
     except:
-        print("ci data not found, creating them..")
-        train = util.Feature(month=train_month)
-        train.user_data(train_file_name)
-
-        test = util.Feature(month=test_month)
-        test.user_data(test_file_name)
-
-        train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
+        print("ci data not found, creating them in build_feature.py")
     finally:
         print('reading data finished..')
         return train, test
 
 def train(models):
-    train, test = get_data(params.ci_train_file_name, params.ci_test_file_name, train_month=[2, 3, 4],
-                                test_month=[5])
+    train, test = get_data(params.train_path + '/456'+params.ci_train_file_name, params.test_path + '/7'+params.ci_test_file_name)
     print(test['target'].value_counts())
     print(train['target'].value_counts())
     # train = util.get_undersample_data2(train)
@@ -107,21 +97,21 @@ def train(models):
             print(ex)
 
     statics = pd.DataFrame([names, auc, precision, elapsed, corrects, errors, corrects_value_counts, errors_value_counts, [x[1] for x in models]]).T
-    statics.columns=['name', 'auc', 'precision', 'time', 'correct', 'error', 'corrects_value_counts', 'errors_value_counts', 'estimator']
+    statics.columns=['name', 'auc', 'precision', 'time', 'correct_number', 'error_number', 'corrects_value_counts', 'errors_value_counts', 'estimator']
     statics.sort_values(by=['auc'], ascending=False, inplace=True)
-    statics.to_csv(params.output + '_'.join(['1452983', '2ci', 'statics']) + '.txt', index=False)
+    statics.to_csv(params.output +'_'.join(['1452983', '2ci', 'statics']) + '_456' + '.txt', index=False)
     print('end')
 
 if __name__ == '__main__':
     train_flag = 1
     if train_flag:
         models = []
-        models.append(('LR', LogisticRegression(penalty='l1', C=0.9, class_weight='balanced')))
-        models.append(('LR_l1', LogisticRegression(C=0.3, penalty='l1')))
+        # models.append(('LR', LogisticRegression(penalty='l1', C=0.9, class_weight='balanced')))
+        # models.append(('LR_l1', LogisticRegression(C=0.3, penalty='l1')))
         models.append(('CART', DecisionTreeClassifier(class_weight=None, splitter='best', max_features='log2', max_depth=2, max_leaf_nodes=300, random_state=0)))
         models.append(('NB', GaussianNB()))
         models.append(('RF', RandomForestClassifier(n_estimators=10, max_features='log2', max_leaf_nodes=300,  max_depth=2, random_state=0)))
-        models.append(('KNN-20', KNeighborsClassifier(n_neighbors=7, weights='uniform', metric='manhattan', leaf_size=20)))
+        models.append(('KNN', KNeighborsClassifier(n_neighbors=7, weights='uniform', metric='manhattan', leaf_size=20)))
         models.append(('Adaboost', AdaBoostClassifier(base_estimator=DecisionTreeClassifier(class_weight='balanced', splitter='best', max_features='sqrt') , n_estimators=30,  random_state=0)))
         models.append(('BaggingClassifier-knn',BaggingClassifier(
             base_estimator=KNeighborsClassifier(n_neighbors=10, metric='manhattan', weights='uniform', leaf_size=21),
@@ -129,12 +119,9 @@ if __name__ == '__main__':
 
         models.append(('GradientBoostingClassifier', GradientBoostingClassifier()))
 
-
         train(models)
-
     else:
         model_params = {
-
             'LogisticRegression': (LogisticRegression(penalty='l1', class_weight='balanced'), {
                 # 'penalty':['l2', 'l1'], l2没用 0.5
                 # 'C': np.arange(0.2, 0.5, 0.1)
@@ -187,29 +174,12 @@ if __name__ == '__main__':
 
             })
         }
-        train, _ = get_data(params.ci_train_file_name, params.ci_test_file_name, train_month=[2, 3, 4],
-                                 test_month=[5])
 
+        train, _ = get_data(params.ci_train_file_name, params.ci_test_file_name)
         # train = util.get_undersample_data2(train)
         # tuning(train, *model_params['LogisticRegression'], scoring= 'roc_auc', unsample=False)
         # tuning(train, *model_params['DecisionTreeClassifier'], scoring='roc_auc', unsample=False)
         # tuning(train, *model_params['KNeighborsClassifier'], scoring='roc_auc', unsample=False, drop_col=['user_id'])
-
         # tuning(train, *model_params['RandomForestClassifier'], scoring='roc_auc', unsample=False)
         tuning(train, *model_params['AdaBoostClassifier'], scoring='roc_auc', unsample=False)
         # tuning(train, *model_params['BaggingClassifier'], scoring='roc_auc', unsample=False)
-
-
-
-# 0.8115466518955038 {'max_depth': 4, 'max_features': 'sqrt', 'splitter': 'random'}
-# 0.7814666957583031 {'max_depth': 2, 'max_features': None, 'splitter': 'best'} undersample
-# 0.8281096301182667 {'criterion': 'entropy', 'max_depth': 2, 'max_features': 'log2', 'n_estimators': 10}
-
-# 0.70755349620567 {'leaf_size': 25, 'metric': 'manhattan', 'n_neighbors': 7}
-# 0.70755349620567 {'leaf_size': 20, 'metric': 'manhattan', 'n_neighbors': 7}
-# 0.8086687565149956 {'max_features': 0.2, 'n_estimators': 23}  n_estimators=20, max_features=0.5
-# 0.8063731432956052 {'bootstrap': False, 'max_features': 0.4, 'n_estimators': 18}
-
-# 0.7824993402382578 {'base_estimator__leaf_size': 21, 'base_estimator__n_neighbors': 10}
-# 0.8132777655809389 {'bootstrap': False, 'max_features': 0.4, 'n_estimators': 20}
-# 0.8521527286379789 {'class_weight': None, 'max_depth': 2, 'max_features': 'log2', 'max_leaf_nodes': 300, 'splitter': 'best'}

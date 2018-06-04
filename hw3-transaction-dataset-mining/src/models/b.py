@@ -7,39 +7,55 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-
 from sklearn.metrics import roc_auc_score, precision_score
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV
 from sklearn import model_selection
-from sklearn import svm
 import os
-from util import Feature
-def get_data(train_file_name, test_file_name, train_month=[2, 3, 4], test_month=[5]):
+from build_feature import Feature
+import build_feature
+def get_data(train_file_name):
     try:
-        print("reading data..", os.path.abspath(train_file_name), os.path.abspath(test_file_name))
+        print("reading data..", os.path.abspath(train_file_name))
         train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
+        # f = Feature()
+        # data = f.read_raw_data('../../data/raw/trade_new.csv')
+        # f.data = data
+        # f.m_action_cr = build_feature.monthly_action_cr(data, month, groupby=['user_id', 'item_id', ['user_id', 'item_id']],
+        #               prefixes=['u_', 'i_', 'ui_'])
+        # f.m_action_cr_agg = build_feature.monthly_action_cr_agg(f.m_action_cr, groupby=['user_id', 'item_id', ['user_id', 'item_id']],
+        #               prefixes=['u_', 'i_', 'ui_'])
+        #
+        # f.users = f.user_profile()
+        # f.items = f.item_profile()
+        #
+        # cols = ['user_id', 'item_id']
+        # ui = f.user_join_item()
+        # if label:
+        #     ui = f.user_item_label(ui, f.month[-1] + 1, cols)
+        #
+        # ui = ui.merge(f.m_action_cr_agg[str(cols)], on=cols, how='left')
+        # ui.fillna(0, inplace=True)
+        # train = ui
+        # ui.to_csv(file_name, index=False)
+        # ui[['user_id', 'item_id', 'target']].to_csv(file_name + 'label', index=False)
+        # print('user_item_data:', ui.columns)
 
     except:
-        print("data not found, creating them..")
-        train = Feature(month=train_month)
-        train.user_item_data(train_file_name)
-
-        test = Feature(month=test_month)
-        test.user_item_data(test_file_name)
-
-        train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
+        print("data not found, creating them in build_feature.py")
     finally:
         print('reading data finished..')
-        return train, test
+        return train
 
 def train(models):
-    train, test = util.get_data(params.b_train_file_name, params.b_test_file_name, train_month=[2, 3, 4], test_month=[5])
+    train = get_data(params.train_path + '/234'+params.b_train_file_name)
+    test = get_data(params.train_path + '/456'+params.b_train_file_name)
+    cols=['user_id', 'item_id']
+    # train = get_data([2,3,4])
+    train = train[train.columns.difference(cols)]
     train = util.get_undersample_data(train)
+
     (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
 
-    print(test['target'].value_counts())
     print(train['target'].value_counts())
 
     results = []
@@ -64,7 +80,7 @@ def train(models):
             start_time = time.time()
 
             model.fit(X_train, y_train)
-            test_pred = model.predict(X_test)
+            test_pred = model.predict(X_test[X_test.columns.difference(['user_id', 'item_id'])])
             test_prec = precision_score(y_test, test_pred, average='micro')
             test_auc = roc_auc_score(y_test, test_pred)
             print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
@@ -113,11 +129,11 @@ if __name__ == '__main__':
     if train_flag:
         models = []
         # models.append(('LR', LogisticRegression(C=0.7, class_weight='balanced', penalty='l2')))
-        models.append(('LR_l1', LogisticRegression(C=0.8, penalty='l1')))
         # models.append(('KNN', KNeighborsClassifier()))
         models.append(('CART', DecisionTreeClassifier()))
         models.append(('NB', GaussianNB()))
         models.append(('RF', RandomForestClassifier()))
+        models.append(('LR_l1', LogisticRegression(C=0.8, penalty='l1')))
         # models.append(('SVM', svm.SVC()))
         train(models)
     else:
@@ -131,9 +147,8 @@ if __name__ == '__main__':
 
             })
         }
-        train, _ = get_data(params.ci_train_file_name, params.ci_test_file_name, train_month=[2, 3, 4],
-                            test_month=[5])
-        tuning(train, model_params['LogisticRegression'][0], model_params['LogisticRegression'][1], scoring='roc_auc')#0.29944351740433783 {'C': 0.4}
+        train, _ = get_data(params.ci_train_file_name)
+        tuning(train, model_params['LogisticRegression'][0], model_params['LogisticRegression'][1], scoring='roc_auc')
         # tuning(model_params['LogisticRegression'][0], model_params['LogisticRegression'][1], scoring='accuracy')
         # tuning(model_params['LogisticRegression'][0], model_params['LogisticRegression'][1], scoring='roc_auc', unsample=False)
 

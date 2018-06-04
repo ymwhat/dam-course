@@ -11,36 +11,33 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn import svm
 
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, KFold, cross_validate
 
 
-def get_data(train_file_name, test_file_name, train_month=[2, 3, 4], test_month=[5]):
+def get_data(train_file_name):
     try:
-        print("reading data file ", os.path.abspath(train_file_name), os.path.abspath(test_file_name))
+        print("reading data file ", os.path.abspath(train_file_name))
         train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
-
+        return train
     except:
         print("data not found, creating them..")
-        train = util.Feature(month=train_month)
-        train.user_cat_data(train_file_name)
-
-        test = util.Feature(month=test_month)
-        test.user_cat_data(test_file_name)
-
-        train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
     finally:
         print('reading data finished..')
-        return train, test
+
 
 def train(models):
-    train, test = get_data(params.ciii_train_file_name, params.ciii_test_file_name, train_month=[2, 3, 4],
-                                test_month=[5])
-    train = util.get_undersample_data(train)
+    test = get_data(params.train_path + '/456' + params.ciii_train_file_name)
+    train = get_data(params.train_path + '/234' + params.ciii_train_file_name)
+    cols = ['user_id', 'cat_id']
+    train = train[train.columns.difference(cols)]
+    # train = util.get_undersample_data(train)
     (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
 
     print(test['target'].value_counts())
@@ -68,7 +65,7 @@ def train(models):
             start_time = time.time()
 
             model.fit(X_train, y_train)
-            test_pred = model.predict(X_test)
+            test_pred = model.predict(X_test[X_test.columns.difference(cols)])
             test_prec = precision_score(y_test, test_pred, average='micro')
             test_auc = roc_auc_score(y_test, test_pred)
             print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
@@ -106,7 +103,6 @@ def train(models):
     statics.columns = ['name', 'auc', 'precision', 'time', 'correct', 'error', 'corrects_value_counts',
                        'errors_value_counts']
     statics.sort_values(by=['auc'], ascending=False, inplace=True)
-
     statics.to_csv(params.output + '_'.join(['1452983', '2ciii', 'statics']) + '.txt', index=False)
     print('end')
 
@@ -114,21 +110,22 @@ if __name__ == '__main__':
     train_flag = 1
     if train_flag:
         models = []
-        # models.append(('LR', LogisticRegression()))
-        models.append(('LR_l1', LogisticRegression(C=0.5, penalty='l1')))
-        # models.append(('KNN', KNeighborsClassifier()))
+
+        models.append(('KNN', KNeighborsClassifier()))
         models.append(('CART', DecisionTreeClassifier()))
         models.append(('NB', GaussianNB()))
         models.append(('RF', RandomForestClassifier()))
-        # models.append(('SVM', svm.SVC()))
-
+        models.append(('Bagging', BaggingClassifier()))
+        models.append(('Adaboost', AdaBoostClassifier()))
+        models.append(('GBDT', GradientBoostingClassifier()))
+        models.append(('LR', LogisticRegression()))
+        # models.append(('LR_l1', LogisticRegression(C=0.5, penalty='l1')))
         train(models)
     else:
         model_params = {
             'LogisticRegression': (LogisticRegression(penalty='l1'), {'C': np.arange(0.5, 0.6, 0.1)})
         }
-        train, _ = get_data(params.ci_train_file_name, params.ci_test_file_name, train_month=[2, 3, 4],
-                            test_month=[5])
+        train, _ = get_data(params.ci_train_file_name)
         tuning(train, model_params['LogisticRegression'][0], model_params['LogisticRegression'][1], scoring='accuracy')
 
 
