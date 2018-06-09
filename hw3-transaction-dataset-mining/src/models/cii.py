@@ -34,8 +34,12 @@ def train(models):
     # train, test = get_data(params.train_path + '/234'+params.cii_train_file_name)
     test = get_data(params.train_path + '/456'+params.cii_train_file_name)
     train = get_data(params.train_path + '/234' + params.cii_train_file_name)
+    predicted = get_data(params.train_path + '/567' + params.cii_train_file_name)
+
+
     cols = ['user_id', 'brand_id']
     train = train[train.columns.difference(cols)]
+    print(train.columns)
     # test = test[test.columns.difference(cols)]
     train = util.get_undersample_data(train)
     (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
@@ -69,6 +73,7 @@ def train(models):
             test_auc = roc_auc_score(y_test, test_pred)
             print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
 
+
             elapsed_time = time.time() - start_time
 
             results.append(cv_results)
@@ -90,8 +95,11 @@ def train(models):
             print(y_test['target'].iloc[correct].value_counts())
             print('predict error value counts:')
             print(y_test['target'].iloc[error].value_counts())
-            util.save_to_file(X_test[['user_id', 'brand_id']], test_pred,
-                               '_'.join(['1452983', '2cii', name]) + '.txt')
+
+            pre = model.predict(predicted[predicted.columns.difference(cols)])
+            util.save_to_file(predicted[['user_id', 'brand_id']], pre,
+                              '_'.join(['1452983', '2cii', name]) + '.txt')
+
 
         except Exception as ex:
             print(ex)
@@ -117,7 +125,6 @@ if __name__ == '__main__':
         models.append(('Adaboost', AdaBoostClassifier()))
         models.append(('GBDT', GradientBoostingClassifier()))
         models.append(('LR_l1', LogisticRegression(C=0.3, penalty='l1')))
-
         train(models)
     else:
         model_params = {

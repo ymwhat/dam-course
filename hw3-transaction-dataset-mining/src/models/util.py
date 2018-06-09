@@ -15,6 +15,7 @@ def pickle_load(file_path):
     with open(file_path, "rb") as f:
         return pickle.load((f))
 
+
 def save_to_file(output, test_pred, filename):
     output['target'] = pd.Series(test_pred).apply(lambda x: 'Yes' if x else 'No')
     output.to_csv(params.output+filename, index=False, header=False)
@@ -36,6 +37,7 @@ def get_undersample_data2(data):
     y_undersample = under_sample_data.loc[:, under_sample_data.columns == 'target']
     print('undersampling: ', X_undersample.shape, y_undersample.shape)
     return under_sample_data
+
 
 def get_undersample_data(data):
     number_records_buy = len(data[data['target'] == 1])
