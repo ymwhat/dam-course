@@ -1,185 +1,173 @@
-import util, params
-from tuning import tuning
 import pandas as pd
 import numpy as np
-import warnings
-warnings.filterwarnings('ignore')
 import time
 import os
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn import svm
-
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
-from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, KFold, cross_validate
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.model_selection import cross_validate, StratifiedKFold
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn import preprocessing
+from util import get_X_y
+import util, params
+from tuning import tuning
+from cii import get_prediction_dist
+cols = ['user_id']
 
-def get_data(train_file_name, test_file_name):
+def get_data(train_file_name):
     try:
-        print("reading data file ", os.path.abspath(train_file_name), os.path.abspath(test_file_name))
+        print("reading data file ", os.path.abspath(train_file_name))
         train = pd.read_csv(train_file_name)
-        test = pd.read_csv(test_file_name)
+        return train
     except:
-        print("ci data not found, creating them in build_feature.py")
+        print("data not found, creating them..")
     finally:
         print('reading data finished..')
-        return train, test
 
-def train(models):
-    train, test = get_data(params.train_path + '/456'+params.ci_train_file_name, params.test_path + '/7'+params.ci_test_file_name)
-    print(test['target'].value_counts())
-    print(train['target'].value_counts())
-    # train = util.get_undersample_data2(train)
-    train.drop('user_id', inplace=True, axis=1)
-    (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
 
-    print(test['target'].value_counts())
-    print(train['target'].value_counts())
+def train_predict(models, names, X_train, y_train, X_test, y_test):
+    statics_arr = []
+    scoring = {'recall': 'recall', 'accuracy': 'accuracy',  'auc': 'roc_auc'}  # , 'auc': 'roc_auc'
 
-    results = []
-    names = []
-    elapsed = []
-    auc = []
-    precision = []
-    corrects, errors=[], []
-    corrects_value_counts, errors_value_counts=[],[]
-
-    scoring = {'recall': 'recall', 'accuracy': 'accuracy'}  # , 'auc': 'roc_auc'
-    for name, model in models:
-        kfold = KFold(n_splits=5, random_state=78)
+    for model, name in zip(models, names):
+        kfold = StratifiedKFold(n_splits=3, random_state=78)
         print('=' * 30)
         try:
             cv_results = cross_validate(model, X_train, y_train, cv=kfold, scoring=scoring)
-
             for score in scoring:
-                msg = "%s: %s mean:%f std:(%f)" % (
-                name, score, cv_results['test_' + score].mean(), cv_results['test_' + score].std())
+                msg = "%s: %s mean: %f " % (name, score, cv_results['test_' + score].mean())
                 print(msg)
 
             start_time = time.time()
-
             model.fit(X_train, y_train)
-            test_pred = model.predict(X_test.loc[:, X_test.columns != 'user_id'])
+            test_pred = model.predict(X_test)
             test_prec = precision_score(y_test, test_pred, average='micro')
-
             test_auc = roc_auc_score(y_test, test_pred)
-            print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
-
             elapsed_time = time.time() - start_time
 
-            results.append(cv_results)
-            auc.append(test_auc)
-            precision.append(test_prec)
-            elapsed.append(elapsed_time)
-            names.append(name)
+            print('Test precision: %f roc_auc: %f' % (test_prec, test_auc))
 
-            correct = np.where(np.array(y_test['target'].tolist()) == test_pred)[0]
-            error = np.where(np.array(y_test['target'].tolist()) != test_pred)[0]
-
-            corrects.append(len(correct))
-            errors.append(len(error))
-            corrects_value_counts.append(y_test['target'].iloc[correct].value_counts().to_dict())
-            errors_value_counts.append(y_test['target'].iloc[error].value_counts().to_dict())
-
-            print('correct: {} errors: {}'.format(len(correct), len(error)))
-            print('predict correct value counts:')
-            print(y_test['target'].iloc[correct].value_counts())
-            print('predict error value counts:')
-            print(y_test['target'].iloc[error].value_counts())
-
-
-            util.save_to_file(X_test[['user_id']], test_pred,
-                               '_'.join(['1452983', '2ci', name]) + '.txt')
+            static = [name, test_auc, test_prec, elapsed_time, *get_prediction_dist(y_test, test_pred), model]
+            statics_arr.append(static)
 
         except Exception as ex:
             print(ex)
 
-    statics = pd.DataFrame([names, auc, precision, elapsed, corrects, errors, corrects_value_counts, errors_value_counts, [x[1] for x in models]]).T
-    statics.columns=['name', 'auc', 'precision', 'time', 'correct_number', 'error_number', 'corrects_value_counts', 'errors_value_counts', 'estimator']
-    statics.sort_values(by=['auc'], ascending=False, inplace=True)
-    statics.to_csv(params.output +'_'.join(['1452983', '2ci', 'statics']) + '_456' + '.txt', index=False)
-    print('end')
+    statics = pd.DataFrame(statics_arr, columns=['Model', 'Test_auc', 'Test_precision', 'Time', 'Correct', 'Error', 'Correct value counts', 'Error value counts', 'Estimator'])
+    statics.sort_values(by=['Test_auc'], ascending=False, inplace=True)
+    statics.to_csv(params.output + '_'.join(['1452983', '2ci', 'statics']) + '.txt', index=False)
+    return np.array(statics_arr)[:, -1]
+
+def get_models():
+    nb = GaussianNB()
+    knn = KNeighborsClassifier(n_neighbors=1)
+    ada = AdaBoostClassifier(n_estimators=50)
+    rf = RandomForestClassifier(random_state=6, class_weight='balanced',  n_estimators=35)
+    bagging = BaggingClassifier()
+    dt = DecisionTreeClassifier(random_state=6, class_weight='balanced')
+    lr_l1 = LogisticRegression(C=0.3, penalty='l1')
+    gbdt = GradientBoostingClassifier()
+
+    name = ['RandomForestClassifier',
+            'GradientBoostingClassifier',
+            'BaggingClassifier',
+            'AdaBoostClassifier',
+            'DecisionTreeClassifier',
+            'GaussianNB',
+            'KNeighborsClassifier',
+            'LR_l1']
+    model = [rf, gbdt, bagging, ada, dt, nb, knn]
+
+    return model, name
+
+
+def feature_selection(X, y):
+    print(X.shape)
+    clf = ExtraTreesClassifier()
+    clf = clf.fit(X, y)
+    model = SelectFromModel(clf, prefit=True, threshold='median')
+    return model
+
+def get_undersample_data(data):
+    number_records_buy = len(data[data['target'] == 1])
+    buy_indices = np.array(data[data['target'] == 1].index)
+    not_indices = data[data['target'] == 0].index
+
+    random_not_indices = np.random.choice(not_indices, number_records_buy, replace=False)
+    random_not_indices = np.array(random_not_indices)
+
+    under_sample_indices = np.concatenate([buy_indices, random_not_indices])
+    under_sample_data = data.iloc[under_sample_indices, :]
+
+    # len(under_sample_data[under_sample_data.Class == 1]), len(under_sample_data[under_sample_data.Class == 0])
+    X_undersample = under_sample_data.loc[:, under_sample_data.columns != 'target']
+    y_undersample = under_sample_data.loc[:, under_sample_data.columns == 'target']
+    print('undersampling: ', X_undersample.shape, y_undersample.shape)
+    return under_sample_data
 
 if __name__ == '__main__':
     train_flag = 1
+
+    train = get_data(params.train_path + '/234' + params.ci_train_file_name)
+    test = get_data(params.train_path + '/456' + params.ci_train_file_name)
+    predicted = get_data(params.train_path + '/567' + params.ci_train_file_name)
+
+    train = train.drop(cols, axis=1)
+    test = test.drop(cols, axis=1)
+    X_predict = predicted.drop(cols, axis=1)
+
+    (X_train, y_train), (X_test, y_test) = get_X_y(train), get_X_y(test)
+
+    # X_train, y_train = RandomOverSampler('minority').fit_sample(X_train, y_train)
+    # X_train, y_train, _ = RandomUnderSampler(return_indices=True).fit_sample(X_train, y_train)
+
+    fs_model = feature_selection(X_train, y_train)
+    print(X_train.shape, y_train.shape)
+    X_train = fs_model.transform(X_train)
+    print(X_train.shape, y_train.shape)
+    X_test = fs_model.transform(X_test)
+    X_predict = fs_model.transform(predicted.drop(cols, axis=1))
+
     if train_flag:
-        models = []
-        # models.append(('LR', LogisticRegression(penalty='l1', C=0.9, class_weight='balanced')))
-        # models.append(('LR_l1', LogisticRegression(C=0.3, penalty='l1')))
-        models.append(('CART', DecisionTreeClassifier(class_weight=None, splitter='best', max_features='log2', max_depth=2, max_leaf_nodes=300, random_state=0)))
-        models.append(('NB', GaussianNB()))
-        models.append(('RF', RandomForestClassifier(n_estimators=10, max_features='log2', max_leaf_nodes=300,  max_depth=2, random_state=0)))
-        models.append(('KNN', KNeighborsClassifier(n_neighbors=7, weights='uniform', metric='manhattan', leaf_size=20)))
-        models.append(('Adaboost', AdaBoostClassifier(base_estimator=DecisionTreeClassifier(class_weight='balanced', splitter='best', max_features='sqrt') , n_estimators=30,  random_state=0)))
-        models.append(('BaggingClassifier-knn',BaggingClassifier(
-            base_estimator=KNeighborsClassifier(n_neighbors=10, metric='manhattan', weights='uniform', leaf_size=21),
-            n_estimators=20, max_features=0.4, bootstrap=False, random_state=0)))
+        models, names = get_models()
+        estimators = train_predict(models, names, X_train, y_train, X_test, y_test)
+        for estimator, name in zip(estimators, names):
+            util.save_to_file(predicted[cols], estimator.predict(X_predict),
+                              '_'.join(['1452983', '2ci', name]) + '.txt')
 
-        models.append(('GradientBoostingClassifier', GradientBoostingClassifier()))
-
-        train(models)
     else:
         model_params = {
-            'LogisticRegression': (LogisticRegression(penalty='l1', class_weight='balanced'), {
-                # 'penalty':['l2', 'l1'], l2没用 0.5
+            'LogisticRegression': (LogisticRegression(penalty='l2'), {
+                # 'penalty':['l2', 'l1'], l2没用
                 # 'C': np.arange(0.2, 0.5, 0.1)
-                'C': np.arange(0.5, 1, 0.2),
-                # 'class_weight': ['balanced', None]
+                'C': np.arange(0.2, 0.5, 0.1)
             }),
-            'DecisionTreeClassifier': (DecisionTreeClassifier(class_weight='balanced'), {
-                # 'criterion': ['gini', 'entropy'],
-                'class_weight': ['balanced', None],
-                'splitter': ['best', 'random'],
-                'max_features': [None, 'sqrt', 'log2'],
-                'max_depth': list(range(2, 8, 1))+[None],
-                'max_leaf_nodes': range(100, 1000, 100)
-            })
-            ,'RandomForestClassifier': (RandomForestClassifier(oob_score=True, verbose=2, random_state=0), {
-                'n_estimators': range(5, 30, 5),
-                'criterion': ['gini', 'entropy'],
-                'max_features': [None, 'sqrt', 'log2'],
-                'max_depth': range(2, 20, 2)
-
+            'DecisionTreeClassifier': (DecisionTreeClassifier(), {
+                'class_weight': ['balanced', None]
             }),
-            # KNeighborsClassifier doesn't support sample_weight.
-            'AdaBoostClassifier':(AdaBoostClassifier(base_estimator=KNeighborsClassifier(), algorithm='SAMME'), {
-                'n_estimators' : range(10, 50, 10)
-            }),
-            'KNeighborsClassifier': (KNeighborsClassifier(n_jobs=-1, weights='uniform'), {
-                'n_neighbors': range(1, 8, 2),
-                # 'weights': ['uniform', 'distance']
-                # 'metric': ['manhattan', 'euclidean'],
-                'leaf_size': range(20, 25, 1)
-            }),
-            'BaggingClassifier': (BaggingClassifier(base_estimator=KNeighborsClassifier(n_neighbors=10, metric='manhattan', weights='uniform', leaf_size = 21),
-                                                    n_estimators=20, max_features=0.4, bootstrap=False, random_state=0), {
-                # 'base_estimator__n_neighbors': range(2, 15, 2),
-                # 'base_estimator__leaf_size': range(15, 30, 2),
-                'n_estimators': range(8, 30, 2),
-                'max_features': np.arange(0.4, 1.0, 0.2),
-                'bootstrap':[True, False]
-            }),
-            'BaggingClassifier-dt': (BaggingClassifier(
-                base_estimator=DecisionTreeClassifier(),
-                n_estimators=20, max_features=0.4, bootstrap=False, random_state=0), {
-                                      # 'base_estimator__n_neighbors': range(2, 15, 2),
-                                      # 'base_estimator__leaf_size': range(15, 30, 2),
-                                      'n_estimators': range(8, 30, 2),
-                                      'max_features': np.arange(0.4, 1.0, 0.2),
-                                      'bootstrap': [True, False]
-                                  }),
-            'GradientBoostingClassifier':(GradientBoostingClassifier(), {
-
+            'KNeighborsClassifier': (KNeighborsClassifier(), {
+                'n_neighbors' : range(2, 5, 1)
             })
         }
+        rf = (RandomForestClassifier(class_weight=None, max_features='log2', random_state=6), {
+            # 'class_weight': ['balanced', None],
+            # 'max_features' : ['auto', 'log2', 'sqrt', None],
+            'n_estimators': range(5, 35, 5)
+        })
+        dt = (DecisionTreeClassifier(random_state=6,), {
+            'class_weight': ['balanced', None],
+            'max_features': ['auto', 'log2', 'sqrt', None]
+        })
+        # tuning(train, *dt, scoring='roc_auc', unsample=False)
+        # tuning(train, *rf, scoring='roc_auc', unsample=False)
 
-        train, _ = get_data(params.ci_train_file_name, params.ci_test_file_name)
-        # train = util.get_undersample_data2(train)
-        # tuning(train, *model_params['LogisticRegression'], scoring= 'roc_auc', unsample=False)
-        # tuning(train, *model_params['DecisionTreeClassifier'], scoring='roc_auc', unsample=False)
-        # tuning(train, *model_params['KNeighborsClassifier'], scoring='roc_auc', unsample=False, drop_col=['user_id'])
-        # tuning(train, *model_params['RandomForestClassifier'], scoring='roc_auc', unsample=False)
-        tuning(train, *model_params['AdaBoostClassifier'], scoring='roc_auc', unsample=False)
-        # tuning(train, *model_params['BaggingClassifier'], scoring='roc_auc', unsample=False)
+

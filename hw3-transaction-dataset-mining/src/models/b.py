@@ -14,13 +14,16 @@ from sklearn.metrics import roc_auc_score, precision_score
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV
 from sklearn import model_selection
 import os
-from sklearn import preprocessing
-from build_feature import Feature
-import build_feature
-from sklearn.decomposition import PCA
-from sklearn.feature_selection import VarianceThreshold
-from scipy.stats import pearsonr
-from sklearn.preprocessing import Normalizer
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_validate, StratifiedKFold
+
+# from util import get_X_y
+from cii import get_prediction_dist
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectFromModel
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+
+cols = ['user_id', 'item_id']
 
 def read_raw_data(self, file_name='../../data/raw/trade_new.csv'):
     data = pd.read_csv(file_name, index_col=0)
@@ -48,29 +51,24 @@ def get_data(train_file_name):
         print('reading data finished..')
         return train
 
-def train(models):
-    train = get_data(params.train_path + '/234'+params.b_train_file_name)
-    test = get_data(params.train_path + '/456'+params.b_train_file_name)
-    print(train.shape)
-    predicted = get_data(params.train_path + '/567' + params.b_train_file_name)
+def train_predict(models, names, X_train, y_train, X_test, y_test):
 
-    cols=['user_id', 'item_id']
     # train = get_data([2,3,4])
 
-    train = util.get_undersample_data(train)
-    train = train[train.columns.difference(cols)]
-    test = test[test.columns.difference(cols)]
-    (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
-
-    print('before variance', X_train.shape)
-    vt = VarianceThreshold(threshold=44)
-    X_train = vt.fit_transform(X_train)
-    X_test = vt.transform(X_test)
-    print('after variance', X_train.shape)
-
-    min_max_scaler = preprocessing.MinMaxScaler()
-    X_train = min_max_scaler.fit_transform(X_train)
-    X_test = min_max_scaler.fit_transform(X_test)
+    # train = util.get_undersample_data(train)
+    # train = train[train.columns.difference(cols)]
+    # test = test[test.columns.difference(cols)]
+    # (X_train, y_train), (X_test, y_test) = util.get_X_y(train), util.get_X_y(test)
+    #
+    # print('before variance', X_train.shape)
+    # vt = VarianceThreshold(threshold=44)
+    # X_train = vt.fit_transform(X_train)
+    # X_test = vt.transform(X_test)
+    # print('after variance', X_train.shape)
+    #
+    # min_max_scaler = preprocessing.MinMaxScaler()
+    # X_train = min_max_scaler.fit_transform(X_train)
+    # X_test = min_max_scaler.fit_transform(X_test)
 
 
     # pca = PCA(n_components=30)
@@ -78,89 +76,106 @@ def train(models):
     # X_train = pca.transform(X_train)
     # X_test = pca.transform(X_test)
 
-    results = []
-    names = []
-    elapsed = []
-    auc = []
-    precision = []
-    corrects, errors = [], []
-    corrects_value_counts, errors_value_counts = [], []
+    statics_arr = []
+    scoring = {'recall': 'recall', 'accuracy': 'accuracy', 'auc': 'roc_auc'}  # , 'auc': 'roc_auc'
 
-    scoring = {'recall': 'recall', 'accuracy': 'accuracy'}#, 'auc': 'roc_auc'
-    for name, model in models:
-        kfold = model_selection.KFold(n_splits=3, random_state=78)
-        print('='*30)
+    for model, name in zip(models, names):
+        kfold = StratifiedKFold(n_splits=3, random_state=78)
+        print('=' * 30)
         try:
-            cv_results = model_selection.cross_validate(model, X_train, y_train, cv=kfold, scoring=scoring)
-
+            cv_results = cross_validate(model, X_train, y_train, cv=kfold, scoring=scoring)
             for score in scoring:
-                msg = "%s: %s mean:%f std:(%f)" % (name, score, cv_results['test_'+score].mean(), cv_results['test_'+score].std())
+                msg = "%s: %s mean: %f " % (name, score, cv_results['test_' + score].mean())
                 print(msg)
 
             start_time = time.time()
-
             model.fit(X_train, y_train)
             test_pred = model.predict(X_test)
-
-            # test_pred = model.predict(X_test[X_test.columns.difference(['user_id', 'item_id'])])
             test_prec = precision_score(y_test, test_pred, average='micro')
             test_auc = roc_auc_score(y_test, test_pred)
-            print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
-
             elapsed_time = time.time() - start_time
 
-            results.append(cv_results)
-            auc.append(test_auc)
-            precision.append(test_prec)
-            elapsed.append(elapsed_time)
-            names.append(name)
+            print('test precision: %f roc_auc: %f' % (test_prec, test_auc))
 
-            correct = np.where(np.array(y_test['target'].tolist()) == test_pred)[0]
-            error = np.where(np.array(y_test['target'].tolist()) != test_pred)[0]
-
-            corrects.append(len(correct))
-            errors.append(len(error))
-            corrects_value_counts.append(y_test['target'].iloc[correct].value_counts().to_dict())
-            errors_value_counts.append(y_test['target'].iloc[error].value_counts().to_dict())
-
-            print('correct: {} errors: {}'.format(len(correct),len(error)))
-            print('predict correct value counts:')
-            print(y_test['target'].iloc[correct].value_counts())
-            print('predict error value counts:')
-            print(y_test['target'].iloc[error].value_counts())
-
-
-            # util.save_to_file(X_test[['user_id', 'item_id']], test_pred,
-            #              '_'.join(['1452983', '2b', name]) + '.txt')
+            static = [name, test_auc, test_prec, elapsed_time, *get_prediction_dist(y_test, test_pred), model]
+            statics_arr.append(static)
 
         except Exception as ex:
             print(ex)
 
-    statics = pd.DataFrame(
-        [names, auc, precision, elapsed, corrects, errors, corrects_value_counts, errors_value_counts]).T
-    statics.columns = ['name', 'auc', 'precision', 'time', 'correct', 'error', 'corrects_value_counts',
-                       'errors_value_counts']
-    statics.sort_values(by=['auc'], ascending=False, inplace=True)
+    statics = pd.DataFrame(statics_arr, columns=['Model', 'Test_auc', 'Test_precision', 'Time', 'Correct', 'Error',
+                                                 'Correct value counts', 'Error value counts', 'Estimator'])
+    statics.sort_values(by=['Test_auc'], ascending=False, inplace=True)
 
     statics.to_csv(params.output + '_'.join(['1452983', '2b', 'statics']) + '.txt', index=False)
-    print('end')
+    return np.array(statics_arr)[:, -1]
+
+def get_models():
+    nb = GaussianNB()
+    knn = KNeighborsClassifier(n_neighbors=3)
+    ada = AdaBoostClassifier(n_estimators=50, learning_rate=1.0)
+    rf = RandomForestClassifier(random_state=6, class_weight=None, max_features='log2', n_estimators=30)
+    bagging = BaggingClassifier()
+    dt = DecisionTreeClassifier(random_state=6, class_weight='balanced', max_features='auto')
+    lr_l1 = LogisticRegression(C=0.3, penalty='l1')
+    gbdt = GradientBoostingClassifier()
+
+    name = ['RandomForestClassifier',
+            'GradientBoostingClassifier',
+            'BaggingClassifier',
+            'AdaBoostClassifier',
+            'DecisionTreeClassifier',
+            'GaussianNB',
+            'KNeighborsClassifier',
+            'LR_l1']
+    model = [rf, gbdt, bagging, ada, dt, nb, knn]
+
+    return model, name
+
+def get_X_y(data):
+    X = data.loc[:, data.columns != 'target']
+    y = data.loc[:, data.columns == 'target']
+    return X, y
+
+def feature_selection(X, y):
+    print(X.shape)
+    clf = ExtraTreesClassifier()
+    clf = clf.fit(X, y)
+    model = SelectFromModel(clf, threshold='0.7*mean', prefit=True)
+    return model
 
 
 if __name__ == '__main__':
     train_flag = 1
+
+    train = get_data(params.train_path + '/234' + params.b_train_file_name)
+    test = get_data(params.train_path + '/456' + params.b_train_file_name)
+    predicted = get_data(params.train_path + '/567' + params.b_train_file_name)
+    train = train.drop(cols, axis=1)
+    test = test.drop(cols, axis=1)
+
+    # train = util.get_undersample_data(train)
+    # print('undersample', train.shape)
+    (X_train, y_train), (X_test, y_test) = get_X_y(train), get_X_y(test)
+
+    print(X_train.shape, y_train.shape)
+    X_train, y_train = RandomOverSampler('minority').fit_sample(X_train, y_train)
+    print(X_train.shape, y_train.shape)
+
+    fs_model = feature_selection(X_train, y_train)
+    print(X_train.shape)
+    X_train = fs_model.transform(X_train)
+    X_test = fs_model.transform(X_test)
+    X_predict = fs_model.transform(predicted.drop(cols, axis=1))
+    print(X_train.shape)
+
     if train_flag:
-        models = []
-        # models.append(('LR', LogisticRegression(C=0.7, class_weight='balanced', penalty='l2')))
-        # models.append(('KNN', KNeighborsClassifier()))
-        models.append(('CART', DecisionTreeClassifier()))
-        models.append(('NB', GaussianNB()))
-        models.append(('RF', RandomForestClassifier()))
-        # models.append(('LR_l1', LogisticRegression(C=0.8, penalty='l1')))
-        models.append(('Bagging', BaggingClassifier()))
-        models.append(('Adaboost', AdaBoostClassifier()))
-        models.append(('GBDT', GradientBoostingClassifier()))
-        # models.append(('SVM', svm.SVC()))
-        train(models)
+        models, names = get_models()
+        estimators = train_predict(models, names, X_train, y_train, X_test, y_test)
+        for estimator, name in zip(estimators, names):
+            util.save_to_file(predicted[cols], estimator.predict(X_predict),
+                              '_'.join(['1452983', '2b', name]) + '.txt')
+
     else:
         model_params = {
             'LogisticRegression': (LogisticRegression(penalty='l1'), {

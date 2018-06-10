@@ -116,69 +116,77 @@ class Feature(object):
 
     def item_profile(self):
         merge_key = 'item_id'
-        trend = self.m_action_cr[merge_key].columns[
-            self.m_action_cr[merge_key].columns.str.find('trend') != -1].tolist()
-        dev = self.m_action_cr[merge_key].columns[self.m_action_cr[merge_key].columns.str.find('dev') != -1].tolist()
-        repeat = self.repeat[merge_key].columns[self.repeat[merge_key].columns.str.find('repeat') != -1].tolist()
 
-        items = self.m_action_cr_agg[merge_key].merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer')\
-            .merge(self.bci_user_agg[merge_key], on=merge_key, how='outer')\
-            .merge(self.m_action_cr[merge_key][[merge_key]+trend+dev], on=merge_key, how='outer')\
-            .merge(self.repeat[merge_key][[merge_key]+repeat], on=merge_key, how='outer')
+        items = self.m_action_cr_agg[merge_key] \
+            .merge(self.m_action_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.repeat[merge_key], on=merge_key, how='outer')
+        items.fillna(0, inplace=True)
+        print('brand profile:', len(items.columns), items.columns)
 
-        self.items = items
         del merge_key
-        return self.items
+        return items
 
     def user_profile(self):
         merge_key = 'user_id'
-        trend = self.m_action_cr[merge_key].columns[self.m_action_cr[merge_key].columns.str.find('trend')!=-1].tolist()
-        dev = self.m_action_cr[merge_key].columns[self.m_action_cr[merge_key].columns.str.find('dev')!=-1].tolist()
+        users = self.m_action_cr_agg[merge_key] \
+            .merge(self.m_action_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pd_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pd_cr_agg[merge_key], on=merge_key, how='outer')
 
-        users = self.m_action_cr_agg[merge_key].merge(self.m_pd_cr_agg[merge_key], on=merge_key, how='outer')\
-            .merge(self.user_bci_agg[merge_key], on=merge_key, how='outer').merge(self.m_action_cr[merge_key][[merge_key]+trend+dev], on=merge_key, how='outer')
+        print('user_profile', len(users.columns), users.columns)
         self.users = users
         del merge_key
-
-        return self.users
+        return users
 
     def brand_profile(self):
         merge_key = 'brand_id'
-        trend = self.m_action_cr[merge_key].columns[
-            self.m_action_cr[merge_key].columns.str.find('trend') != -1].tolist()
-        dev = self.m_action_cr[merge_key].columns[self.m_action_cr[merge_key].columns.str.find('dev') != -1].tolist()
-        repeat = self.repeat[merge_key].columns[self.repeat[merge_key].columns.str.find('repeat') != -1].tolist()
-
-        brands = self.m_action_cr_agg[merge_key].merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer')\
-            .merge(self.bci_user_agg[merge_key],on=merge_key, how='outer')\
+        brands = self.m_action_cr_agg[merge_key] \
+            .merge(self.m_action_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr[merge_key], on=merge_key, how='outer') \
             .merge(self.m_pd_cr_agg[merge_key], on=merge_key, how='outer') \
-            .merge(self.m_action_cr[merge_key][[merge_key] + trend + dev], on=merge_key, how='outer') \
-            .merge(self.repeat[merge_key][[merge_key] + repeat], on=merge_key, how='outer')
+            .merge(self.m_pd_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.repeat[merge_key], on=merge_key, how='outer')\
 
-        self.brands = brands
-
-        return self.brands
+        print('brand profile:', len(brands.columns), brands.columns)
+        return brands
 
     def cat_profile(self):
         merge_key = 'cat_id'
-        trend = self.m_action_cr[merge_key].columns[
-            self.m_action_cr[merge_key].columns.str.find('trend') != -1].tolist()
-        dev = self.m_action_cr[merge_key].columns[self.m_action_cr[merge_key].columns.str.find('dev') != -1].tolist()
-        repeat = self.repeat[merge_key].columns[self.repeat[merge_key].columns.str.find('repeat') != -1].tolist()
 
-        cats = self.m_action_cr_agg[merge_key].merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer')\
-            .merge(self.bci_user_agg[merge_key],on=merge_key, how='outer')\
+        cats = self.m_action_cr_agg[merge_key] \
+            .merge(self.m_action_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr_agg[merge_key], on=merge_key, how='outer') \
+            .merge(self.m_pen_cr[merge_key], on=merge_key, how='outer') \
             .merge(self.m_pd_cr_agg[merge_key], on=merge_key, how='outer') \
-            .merge(self.m_action_cr[merge_key][[merge_key] + trend + dev], on=merge_key, how='outer') \
-            .merge(self.repeat[merge_key][[merge_key] + repeat], on=merge_key, how='outer')
+            .merge(self.m_pd_cr[merge_key], on=merge_key, how='outer') \
+            .merge(self.repeat[merge_key], on=merge_key, how='outer')
 
-        self.cats = cats
-
-        return self.cats
+        print('cat profile:', len(cats.columns))
+        return cats
 
     def user_join_item(self):
-        users = self.users
-        items = self.items
+        users = self.user_profile()
+        items = self.item_profile()
+        merge_key='item_id'
+        users_items_agg = bci_agg(self.data, months=self.month, groupby1=['user_id'], groupby2=[merge_key])['user_id']
+        items_users_agg = user_agg(self.data, months=self.month, groupby=[merge_key])[merge_key]
+        users_items_repeat = repeat_feature(self.data, months=self.month, groupby=['user_id'], cols=[merge_key])[
+            'user_id']
+
+        users = users.merge(users_items_agg, on='user_id', how='outer').merge(users_items_repeat, on='user_id',
+                                                                               how='outer')
+        items = items.merge(items_users_agg, on=merge_key, how='left')
+
+        m_pd_cr = monthly_product_diversity_cr(self.data, months=self.month, groupby=['user_id'])
+        k_attrs = {
+            'user_id': ['item']
+        }
+        m_pd_cr_agg = monthly_product_diversity_agg(m_pd_cr, k_attrs)
+        users = users.merge(m_pd_cr_agg['user_id'], on='user_id', how='outer')
+
 
         ui_df = self.m_action_cr_agg[str(['user_id', 'item_id'])].merge(users, on='user_id', how='left') \
             .merge(items, on='item_id', how='left')
@@ -186,22 +194,45 @@ class Feature(object):
         return ui_df
 
     def user_join_brand(self):
-        users = self.users
-        brands = self.brands
+        users = self.user_profile()
+        brands = self.brand_profile()
+        print('users:', users.shape, 'brands:', brands.shape)
 
+        users_brands_agg = bci_agg(self.data, months=self.month, groupby1=['user_id'], groupby2=['brand_id'])['user_id']
+        brands_users_agg = user_agg(self.data, months=self.month, groupby=['brand_id'])['brand_id']
+        users_brands_repeat = repeat_feature(self.data, months=self.month, groupby=['user_id'], cols=['brand_id'])['user_id']
+
+        users = users.merge(users_brands_agg, on='user_id', how='outer').merge(users_brands_repeat, on='user_id', how='outer')
+        brands = brands.merge(brands_users_agg, on='brand_id', how='left')
+        print('users:', users.shape, 'brands:', brands.shape)
+        # users = self.users
+        # brands = self.brands
         ub_df = self.m_action_cr_agg[str(['user_id', 'brand_id'])].merge(users, on='user_id', how='left') \
             .merge(brands, on='brand_id', how='left')
         ub_df.fillna(0, inplace=True)
         return ub_df
 
     def user_join_cat(self):
-        users = self.users
-        cats = self.cats
+        key = 'cat_id'
+        users = self.user_profile()
+        cats = self.cat_profile()
+        print('users:', users.shape, 'cats:', cats.shape)
 
-        ub_df = self.m_action_cr_agg[str(['user_id', 'cat_id'])].merge(users, on='user_id', how='left') \
-            .merge(cats, on='cat_id', how='left')
+        users_cats_agg = bci_agg(self.data, months=self.month, groupby1=['user_id'], groupby2=[key])['user_id']
+        cats_users_agg = user_agg(self.data, months=self.month, groupby=[key])[key]
+        users_brands_repeat = repeat_feature(self.data, months=self.month, groupby=['user_id'], cols=[key])[
+            'user_id']
+
+        users = users.merge(users_cats_agg, on='user_id', how='outer').merge(users_brands_repeat, on='user_id',
+                                                                               how='outer')
+        cats = cats.merge(cats_users_agg, on=key, how='left')
+        print('users:', users.shape, 'cats:', cats.shape)
+
+        ub_df = self.m_action_cr_agg[str(['user_id', key])].merge(users, on='user_id', how='left') \
+            .merge(cats, on=key, how='left')
         ub_df.fillna(0, inplace=True)
         return ub_df
+
     def user_item_label(self, df, month, cols):
         label_month = get_data_by_month(self.data, [month])
         label_month = label_month[cols].groupby(cols).count().reset_index()
@@ -209,7 +240,7 @@ class Feature(object):
         df = df.merge(label_month, on=cols, how='left')
         df.fillna(0, inplace=True)
 
-        print(label_month.shape, df.shape, df['target'].value_counts())
+        print('last month:', month,label_month.shape, df.shape, df['target'].value_counts())
         return df
 
     def user_item_data(self, file_name, label=True):
@@ -218,16 +249,26 @@ class Feature(object):
         if label:
             ui = self.user_item_label(ui, self.month[-1]+1, cols)
 
-        ui = ui.merge(self.m_action_cr_agg[str(cols)], on=cols, how='left')
+        # ui = ui.merge(self.m_action_cr_agg[str(cols)], on=cols, how='left')
         ui.fillna(0, inplace=True)
         ui.to_csv(file_name, index=False)
-        ui[['user_id', 'item_id', 'target']].to_csv(file_name + 'label', index=False)
         print('user_item_data:', ui.columns)
         return ui
 
     #repeat buyer
-    def user_data(self, file_name):
-        users = self.users #(416, 29)
+    def user_data(self, file_name, label=True):
+        users = self.user_profile()
+        cols = ['user_id']
+        users_repeat = repeat_feature(self.data, months=self.month, groupby=['user_id'], cols=['brand_id', 'item_id', 'cat_id'])[
+            'user_id']
+        users_bci = bci_agg(self.data, months=self.month, groupby1=['user_id'])
+        users = users.merge(users_repeat, on='user_id', how='left').merge(users_bci['item_id'], on='user_id', how='left')
+        if label:
+            users = self.user_item_label(users, self.month[-1]+1, cols)
+        users.fillna(0, inplace=True)
+        users.to_csv(file_name, index=False)
+        print('user data:', users.columns)
+        return users
 
         def get_m_days(m):
             cols = self.m_action_cr['user_id'].columns
@@ -240,92 +281,109 @@ class Feature(object):
             col = cols[cols.str.find(str(m)) != -1].tolist()
             return self.m_action_cr['user_id'][['user_id']+ col]
 
-        results = []
-        if len(self.month) > 1:
-            for m in self.month[:-1]:
-                m_data = get_m_data(m)
-                next_month, col_name = get_m_days(m+1)
-                next_month = next_month.loc[next_month[col_name] != 0]
-                next_month[col_name] = 1
-                result = m_data.merge(next_month, on='user_id', how='left')
-                result.fillna(0, inplace=True)
-                result.columns=['user_id', 'frequency', 'days', 'amts', 'target']
-                results.append(result)
-            results = pd.concat(results)
-            results = results.merge(users, on='user_id', how='left')
-        else:
-            results = get_m_data(self.month[0])
-            if self.month[0] == 5:
-                file = '/234'
-            elif self.month[0] == 7:
-                file='/456'
-            else:
-                print('error..')
+        # results = []
+        # if len(self.month) > 1:
+        #     for m in self.month[:-1]:
+        #         m_data = get_m_data(m)
+        #         next_month, col_name = get_m_days(m+1)
+        #         next_month = next_month.loc[next_month[col_name] != 0]
+        #         next_month[col_name] = 1
+        #         result = m_data.merge(next_month, on='user_id', how='left')
+        #         result.fillna(0, inplace=True)
+        #         result.columns=['user_id', 'frequency', 'days', 'amts', 'target']
+        #         results.append(result)
+        #     results = pd.concat(results)
+        #     results = results.merge(users, on='user_id', how='left')
+        # else:
+        #     results = get_m_data(self.month[0])
+        #     if self.month[0] == 5:
+        #         file = '/234'
+        #     elif self.month[0] == 7:
+        #         file='/456'
+        #     else:
+        #         print('error..')
+        #
+        #     history_users = pickle_load(params.pkl_train_path + file + '/users.pkl')
+        #     results['target'] = 1
+        #     results = history_users.merge(results, on='user_id', how='left')
+        #     results.fillna(0, inplace=True)
 
-            history_users = pickle_load(params.pkl_train_path + file + '/users.pkl')
-            results['target'] = 1
-            results = history_users.merge(results, on='user_id', how='left')
-            results.fillna(0, inplace=True)
-        results.to_csv(file_name, index=False)
 
+    def user_amt_data(self, file_name, label=True):
+        users = self.user_profile()
+        cols = ['user_id']
+        if label:
+            print('dd')
+            label_month = get_data_by_month(self.data, [self.month[-1]+1])
+            label_month = label_month.groupby(cols).sum()['amt'].reset_index()
+            label_month = label_month.rename(columns={'amt':'target'})
+            users = users.merge(label_month, on='user_id', how='left')
+
+        users_repeat = repeat_feature(self.data, months=self.month, groupby=['user_id'], cols=['brand_id', 'item_id', 'cat_id'])[
+            'user_id']
+        users_bci = bci_agg(self.data, months=self.month, groupby1=['user_id'])
+        users = users.merge(users_repeat, on='user_id', how='left')\
+            .merge(users_bci['item_id'], on='user_id', how='left')
+
+        users.fillna(0, inplace=True)
+        users.to_csv(file_name, index=False)
+        print('user data:', users.columns)
         return users
 
-    def user_amt_data(self, file_name):
-        users = self.users #(416, 29)
 
-        def get_m_amts(m):
-            cols = self.m_action_cr['user_id'].columns
-            col = cols[cols.str.find(str(m)) != -1] & cols[cols.str.find(str('amt')) != -1]
-            col = col.tolist()
-            return self.m_action_cr['user_id'][['user_id']+ col], col[0]
+        # def get_m_amts(m):
+        #     cols = self.m_action_cr['user_id'].columns
+        #     col = cols[cols.str.find(str(m)) != -1] & cols[cols.str.find(str('amt')) != -1]
+        #     col = col.tolist()
+        #     return self.m_action_cr['user_id'][['user_id']+ col], col[0]
+        #
+        # def get_m_data(df, m):
+        #     cols = df['user_id'].columns
+        #     col = cols[cols.str.find(str(m)) != -1].tolist()
+        #     return df['user_id'][['user_id']+ col]
+        #
+        # results = []
+        # if len(self.month) > 1:
+        #     for m in self.month[:-1]:
+        #         m_data = get_m_data(self.m_action_cr, m)
+        #         next_month, col_name = get_m_amts(m+1)
+        #         print(col_name)
+        #         # next_month = next_month.loc[next_month[col_name] != 0]
+        #         # next_month[col_name] = 1
+        #
+        #         result = m_data.merge(next_month, on='user_id', how='left')
+        #         result.fillna(0, inplace=True)
+        #         result.columns=['user_id', 'frequency', 'days', 'amts', 'target']
+        #         results.append(result)
+        #         print(len(results))
+        #     results = pd.concat(results)
+        #     results = results.merge(users, on='user_id', how='left')
+        # else:
+        #     cols = self.m_action_cr['user_id'].columns
+        #     col = cols[cols.str.find(str(self.month[0])) != -1] & cols[cols.str.find(str('amt')) != -1]
+        #     col = col.tolist()[0]
+        #     results = get_m_data(self.m_action_cr, self.month[0])
+        #     results = results.rename(columns={col:'target'})
+        #
+        #     last_month = get_m_data(Feature(month=[self.month[0]-1], save_pos='/'+str(self.month[0]-1)).m_action_cr, self.month[0]-1)
+        #
+        #     results = results[['user_id', 'target']].merge(last_month[last_month.columns.tolist()], on='user_id', how='left')
+        #     results.columns = ['user_id', 'target', 'frequency', 'days', 'amts']
+        #
+        #     if self.month[0] == 5:
+        #         file = '/234'
+        #     elif self.month[0] == 7:
+        #         file = '/456'
+        #     else:
+        #         print('error..')
+        #
+        #     history_users = pickle_load(params.pkl_train_path + file + '/users.pkl')
+        #     results = history_users.merge(results, on='user_id', how='left')
+        #     results.fillna(0, inplace=True)
+        #     # print(results.shape)
+        # print('user data ', results.shape)
+        # results.to_csv(file_name, index=False)
 
-        def get_m_data(df, m):
-            cols = df['user_id'].columns
-            col = cols[cols.str.find(str(m)) != -1].tolist()
-            return df['user_id'][['user_id']+ col]
-
-        results = []
-        if len(self.month) > 1:
-            for m in self.month[:-1]:
-                m_data = get_m_data(self.m_action_cr, m)
-                next_month, col_name = get_m_amts(m+1)
-                print(col_name)
-                # next_month = next_month.loc[next_month[col_name] != 0]
-                # next_month[col_name] = 1
-                result = m_data.merge(next_month, on='user_id', how='left')
-                result.fillna(0, inplace=True)
-                result.columns=['user_id', 'frequency', 'days', 'amts', 'target']
-                results.append(result)
-                print(len(results))
-            results = pd.concat(results)
-            results = results.merge(users, on='user_id', how='left')
-        else:
-            cols = self.m_action_cr['user_id'].columns
-            col = cols[cols.str.find(str(self.month[0])) != -1] & cols[cols.str.find(str('amt')) != -1]
-            col = col.tolist()[0]
-            results = get_m_data(self.m_action_cr, self.month[0])
-            results = results.rename(columns={col:'target'})
-
-            last_month = get_m_data(Feature(month=[self.month[0]-1], save_pos='/'+str(self.month[0]-1)).m_action_cr, self.month[0]-1)
-
-            results = results[['user_id', 'target']].merge(last_month[last_month.columns.tolist()], on='user_id', how='left')
-            results.columns = ['user_id', 'target', 'frequency', 'days', 'amts']
-
-            if self.month[0] == 5:
-                file = '/234'
-            elif self.month[0] == 7:
-                file = '/456'
-            else:
-                print('error..')
-
-            history_users = pickle_load(params.pkl_train_path + file + '/users.pkl')
-            results = history_users.merge(results, on='user_id', how='left')
-            results.fillna(0, inplace=True)
-            # print(results.shape)
-        print('user data ', results.shape)
-        results.to_csv(file_name, index=False)
-
-        return users
 
     def user_brand_data(self, file_name, label=True):
         cols = ['user_id', 'brand_id']
@@ -334,7 +392,7 @@ class Feature(object):
             ub = self.user_item_label(ub, self.month[-1] + 1, cols)
 
         #user_item record process
-        ub = ub.merge(self.m_action_cr_agg[str(cols)], on=cols, how='left')
+        # ub = ub.merge(self.m_action_cr_agg[str(cols)], on=cols, how='left')
         ub.fillna(0, inplace=True)
         print('user brand data: ', ub.shape)
         ub.to_csv(file_name, index=False)
@@ -460,13 +518,13 @@ def monthly_product_diversity_cr(data: pd.DataFrame, months, groupby):
         dfs_final[g] = df_final
     return dfs_final
 
-
-def repeat_feature(data: pd.DataFrame, months, groupby):
+#if g == 'user_id' consider cols
+def repeat_feature(data: pd.DataFrame, months, groupby, cols=['item_id', 'brand_id', 'cat_id']):
     dfs_final = {g: pd.DataFrame() for g in groupby}
     unq = pd.Series.nunique
     for g in groupby:
         if g == 'user_id':
-            cols = ['item_id', 'brand_id', 'cat_id']
+            cols = cols
             g_data = get_data_by_month(data, months)
             g_df = pd.DataFrame({g: g_data[g].unique()})
             for col in cols:
@@ -632,6 +690,7 @@ def monthly_action_cr_agg(d, agg_options=['sum', 'min', 'max', 'mean']):
 
 '''
 aggregation : user aggregation
+TYPE.2 AGG feature - user AGG
 '''
 def user_agg(d: pd.DataFrame, months=[2, 3, 4], groupby=['brand_id', 'cat_id', 'item_id'],
              agg=['sum', 'min', 'max', 'mean']):
@@ -653,6 +712,7 @@ def user_agg(d: pd.DataFrame, months=[2, 3, 4], groupby=['brand_id', 'cat_id', '
 
 '''
 aggregation : brand/category/item aggregation
+TYPE.2 AGG feature - brand/category/item AGG
 '''
 def bci_agg(d: pd.DataFrame, months=[2, 3, 4], groupby1=['user_id'], groupby2=['brand_id', 'cat_id', 'item_id'],
             agg=['sum', 'min', 'max', 'mean']):
@@ -672,32 +732,36 @@ def bci_agg(d: pd.DataFrame, months=[2, 3, 4], groupby1=['user_id'], groupby2=['
             t.columns = col_name
             t = t.reset_index()
             t = t.rename(columns={'user_id/': 'user_id'})
-            dfs_final[g1] = t
+            dfs_final[g2] = t
     return dfs_final
 
-def train_csv(month=[4, 5, 6], save_pos='/456'):
+def train_csv(month=[4, 5, 6], save_pos='/456', label=True):
     train = Feature(month=month, save_pos=save_pos)
     train_path = params.train_path + save_pos
     print(train_path)
-    # train.user_item_data(train_path + params.b_train_file_name)
-    # train.user_data(train_path + params.ci_train_file_name)
-    # train.user_amt_data(train_path + params.civ_train_file_name)
-    # train.user_brand_data(train_path + params.cii_train_file_name)
-    train.user_cat_data(train_path + params.ciii_train_file_name)
+
+    # train.user_item_data(train_path + params.b_train_file_name, label=label)
+    # train.user_data(train_path + params.ci_train_file_name, label=label)
+    train.user_amt_data(train_path + params.civ_train_file_name, label=label)
+    # train.user_brand_data(train_path + params.cii_train_file_name, label=label)
+    # train.user_cat_data(train_path + params.ciii_train_file_name, label=label)
 
 def test_csv(month=[7], save_pos='/7'):
     test = Feature(month=month, train=False, save_pos=save_pos)
     test_path = params.test_path + save_pos
     print(test_path)
     test.user_amt_data(test_path + params.civ_test_file_name)
+
     test.user_data(test_path + params.ci_test_file_name)
+
     test.user_brand_data(test_path + params.cii_test_file_name)
     test.user_cat_data(test_path + params.ciii_test_file_name)
     test.user_item_data(test_path + params.b_test_file_name)
 
 if __name__ == '__main__':
-    # train_csv(month=[5, 6, 7], save_pos='/567')
     train_csv(month=[4, 5, 6], save_pos='/456')
     train_csv(month=[2, 3, 4], save_pos='/234')
+    train_csv(month=[5, 6, 7], save_pos='/567', label=False)
+
     # test_csv(month=[5], save_pos='/5')
     # test_csv(month=[7], save_pos='/7')

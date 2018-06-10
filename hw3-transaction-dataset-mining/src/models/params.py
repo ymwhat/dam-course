@@ -11,8 +11,7 @@ cii_train_file_name, cii_test_file_name = '/ub_train.csv', '/ub_test.csv'
 ciii_train_file_name, ciii_test_file_name = '/uc_train.csv', '/uc_test.csv'
 civ_train_file_name, civ_test_file_name = '/ua_train.csv', '/ua_test.csv'
 
-
-
-
 pkl_train_path='../../data/interim/train'
 pkl_test_path='../../data/interim/test'
+
+
